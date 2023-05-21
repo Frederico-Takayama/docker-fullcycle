@@ -1,0 +1,25 @@
+FROM ubuntu:latest AS builder
+
+WORKDIR /golang
+
+RUN apt-get update && \
+    apt install curl -y && \
+    apt install nano
+
+RUN curl -OL https://go.dev/dl/go1.20.4.linux-amd64.tar.gz && \
+    tar -C /usr/local -xzf go1.20.4.linux-amd64.tar.gz && \
+    rm -rf go1.20.4.linux-amd64.tar.gz
+
+ENV PATH "=$PATH:/usr/local/go/bin"
+
+COPY ./files /golang
+
+# CMD ["go","run","."]
+
+FROM scratch
+
+WORKDIR /golang
+
+COPY --from=builder /golang/challenge1 /golang
+
+CMD ["/golang/challenge1"]

@@ -1,0 +1,139 @@
+# ref about how to install: https://go.dev/doc/install
+
+#TODO
+# caçar um dockerhub que usa o Go, dai talvez n tenha que instalar
+# https://hub.docker.com/layers/library/golang/latest/images/sha256-822dd9b43162456c7a9643c1566430c6802354e45b816686ec8141e37471ec9f?context=explore
+# 270.36MB >> 2MB, n é uma opção
+
+# Caçar um com ubuntu e instalar
+# https://hub.docker.com/layers/library/ubuntu/latest/images/sha256-ca5534a51dd04bbcebe9b23ba05f389466cf0c190f1f8f182d7eea92a9671d00?context=explore
+# 28.17MB
+#
+# Caçar o ubuntu lite que ele tinha comentado.. em qual dos videos?
+# ubuntu com nginx > 49.55MB
+# https://hub.docker.com/layers/ubuntu/nginx/latest/images/sha256-9e84ea428dd932048a6202af09c79b91dc1049c91d57f39a403c069d903316f5?context=explore
+
+--------
+# testando: done
+docker pull ubuntu > 4.5MB!
+# docker run -it ubuntu bash > só um teste pra ver se tem bash
+
+WORKDIR usr/local
+
+# https://go.dev/doc/install > how to install golang
+
+# https://www.alura.com.br/artigos/curl-como-usar?gclid=CjwKCAjwgqejBhBAEiwAuWHioLHGr1Q2s-5-R-lUAeVtgugAXASCL79HHYxlPl5_yXQShnhTiPL9QRoCqHkQAvD_BwE
+# https://www.digitalocean.com/community/tutorials/how-to-install-go-on-ubuntu-20-04
+apt-get update
+apt install curl -y
+apt install nano
+# cd usr/local
+curl -OL https://go.dev/dl/go1.20.4.linux-amd64.tar.gz
+
+# https://linuxhint.com/solve-gzip-stdin-not-gzip-format-error/
+#rm -rf /usr/local/go && \
+tar -C /usr/local -xzf go1.20.4.linux-amd64.tar.gz
+# https://stackoverflow.com/questions/28722548/updating-path-environment-variable-permanently-in-docker-container
+export PATH=$PATH:/usr/local/go/bin > isso aqui precisa ficar gravado! > ENV PATH "=$PATH:/usr/local/go/bin"
+#go version
+
+# https://go.dev/doc/tutorial/getting-started > generating the golang file > essa parte precisa montar um volume e copiar em prod!
+mkdir /golang && cd /golang
+go mod init challenges/challenge1
+nano challenge1.go
+
+package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Full Cycle Rocks!!")
+}
+
+go run .
+------
+estava usando esse aqui
+
+magico@DESKTOP-DJGVO3R:~/docker$ docker images
+REPOSITORY   TAG       IMAGE ID       CREATED       SIZE
+ubuntu       latest    3b418d7b466a   3 weeks ago   77.8MB
+
+-------------
+#primeiro criar docker file de desenvolvimento: done
+
+10e28ca5f075   ubuntu    "bash"    49 minutes ago   Exited (0) 9 seconds ago                gallant_chaplygin
+
+docker build -t fredericotakayama/docker-challenge1 . > teste da instalação
+
+magico@DESKTOP-DJGVO3R:~/docker/go$ docker images
+REPOSITORY                            TAG       IMAGE ID       CREATED         SIZE
+fredericotakayama/docker-challenge1   latest    249fb96e2238   9 seconds ago   469MB > ficou bem pesado
+ubuntu                                latest    3b418d7b466a   3 weeks ago     77.8MB > aonde fiz os testes
+
+mas gerou a imagem: ok
+pra testar: ok
+    docker run -it --name golang fredericotakayama/docker-challenge1
+    docker ps -a
+-------------
+# agora gerar um container que compartilhe um volume pra criacao do arquivo
+    docker rm golang
+    docker run -it -rm --name golang --mount type=bind,source="$(pwd)"/files,target=/golang fredericotakayama/docker-challenge1
+-------------
+# criando e gerando um docker de producao: done
+docker build -t fredericotakayama/docker-challenge1 . -f ./Dockerfile.prod
+
+!!! go: go.mod file not found in current directory or any parent directory; see 'go help modules' > parei aqui!
+# https://stackoverflow.com/questions/66894200/error-message-go-go-mod-file-not-found-in-current-directory-or-any-parent-dire
+go env -w GO111MODULE=off > forca cacar o path do go! > agora que esta na pasta do go mod init, n precisa mais disso!
+
+!!! package .: no Go files in /usr/local
+mudei o workdir pro golang!
+
+magico@DESKTOP-DJGVO3R:~/docker/go$ docker run -it --name golang --mount type=bind,source="$(pwd)"/files,target=/golang fredericotakayama/docker-challenge1
+Full Cycle Rocks!!
+
+docker logs golang
+-------------
+acertando os parametros pro desafio: 
+docker build -t fredericotakayama/fullcycle . -f ./Dockerfile.prod
+docker run -it --name fullcycle --mount type=bind,source="$(pwd)"/files,target=/golang fredericotakayama/fullcycle
+
+
+pra ver ainda:
+#verificar se esta abaixo de 2MB: *
+3) A imagem de nosso projeto Go precisa ter menos de 2MB =)
+Dica: No vídeo de introdução sobre o Docker quando falamos sobre o sistema de arquivos em camadas, apresento uma imagem "raiz", talvez seja uma boa utilizá-la.
+
+https://hub.docker.com/_/scratch
+docker pull scratch > n da pra fazer pull!
+https://www.youtube.com/watch?v=ZM22dnwL6LY > aqui mostra que o scratch n tem absolutamente nada, precisa propagar direto o executavel pra ele!
+a ideia seria copiar e rodar somente o executavel do golang, se o mesmo existe!
+
+Todo: então a primeira coisa é coletar um executavel do golang!
+ref.: https://go.dev/doc/tutorial/compile-install
+
+root@486e440837e8:/golang# go build
+root@486e440837e8:/golang# ls
+challenge1  challenge1.go  go.mod
+root@486e440837e8:/golang# ./challenge1
+Full Cycle Rocks!!
+
+q blza, agora sim, usar o scratch no .prod: done
+
+magico@DESKTOP-DJGVO3R:~/docker/go$ docker images
+REPOSITORY                            TAG       IMAGE ID       CREATED             SIZE
+fredericotakayama/fullcycle           latest    27e845d43bd8   4 seconds ago       1.85MB
+
+test: pass!
+magico@DESKTOP-DJGVO3R:~/docker/go$ docker run -it --name fullcycle --mount type=bind,source="$(pwd)"/files,target=/golang fredericotakayama/fullcycle
+Full Cycle Rocks!!
+
+# subir no dockerhub: done
+docker login
+docker push fredericotakayama/fullcycle
+https://hub.docker.com/r/fredericotakayama/fullcycle/tags
+
+# arrumar o github pessoal:
+Suba o projeto em um repositório Git remoto e coloque o link da imagem que subiu no Docker Hub.
+
+#entregar o desafio
